@@ -1,0 +1,17 @@
+# --- Web API ---
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9      # FastAPI'de dosya yükleme (UploadFile) için gerekli
+pydantic-settings>=2.4       # .env'den ayarları okumak için
+
+# --- LLM (provider değiştirilebilir) ---
+google-genai>=1.0           # Gemini (ücretsiz kota) — varsayılan sağlayıcı
+anthropic>=0.45             # Claude API (opsiyonel, LLM_PROVIDER=claude için)
+
+# --- RAG bileşenleri ---
+sentence-transformers>=3.0   # Lokal embedding modeli (torch'u da kurar)
+chromadb>=0.5                # Lokal, kalıcı vektör veritabanı
+pypdf>=4.2                   # PDF'lerden metin çıkarma
+
+# --- Geliştirme / test ---
+pytest>=8.0                  # birim testleri

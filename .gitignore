@@ -1,0 +1,15 @@
+# Ortam değişkenleri (API key'ler ASLA git'e girmesin)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Uygulama verileri (yüklenen dosyalar + vektör DB)
+data/
+chroma_db/
+
+# macOS
+.DS_Store
