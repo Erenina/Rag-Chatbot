@@ -14,18 +14,20 @@ konmalı. Bu önekler modelin eğitildiği biçim; atlanırsa kalite düşer.
 
 from functools import lru_cache
 
-from sentence_transformers import SentenceTransformer
-
 from app.config import settings
 
 
 @lru_cache(maxsize=1)
-def _get_model() -> SentenceTransformer:
+def _get_model():
     """
-    Modeli tembel (lazy) ve tek sefer yükle. lru_cache sayesinde ilk
-    çağrıda diskten/internetten yüklenir, sonraki çağrılarda bellekteki
-    örnek kullanılır — her istekte yeniden yüklemeyiz.
+    Modeli tembel (lazy) ve tek sefer yükle.
+
+    sentence_transformers / torch import'u ağırdır (ilk seferinde 10+ sn).
+    Bu import'u modül başına değil, fonksiyon içine koyuyoruz ki sunucu
+    anında açılsın; ağır yükleme yalnızca ilk embedding çağrısında olsun.
+    lru_cache sayesinde model bir kez yüklenir, sonra bellekten kullanılır.
     """
+    from sentence_transformers import SentenceTransformer
     return SentenceTransformer(settings.embedding_model)
 
 
