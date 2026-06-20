@@ -12,13 +12,8 @@ Kritik fikir: LLM'e "kafandan uydurma, sana verdiğim parçalara dayan"
 talimatı vermek. Bu, halüsinasyonu azaltır ve cevabı denetlenebilir kılar.
 """
 
-import anthropic
-
 from app.config import settings
-from app import embeddings, vectorstore
-
-# Claude istemcisi. API key'i ayarlardan açıkça veriyoruz (.env'den geldi).
-_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+from app import embeddings, vectorstore, llm
 
 SYSTEM_PROMPT = """Sen, kullanıcının yüklediği belgelere dayanarak soru cevaplayan bir asistansın.
 
@@ -50,19 +45,12 @@ def answer_question(question: str, top_k: int | None = None) -> dict:
             "sources": [],
         }
 
-    # 3) Bağlamı hazırla ve Claude'a gönder
+    # 3) Bağlamı hazırla ve seçili LLM'e gönder (Gemini/Claude — llm.py'de)
     context = _build_context(hits)
     user_message = f"Bağlam:\n{context}\n\nSoru: {question}"
 
-    response = _client.messages.create(
-        model=settings.chat_model,
-        max_tokens=settings.max_answer_tokens,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
-    )
-
-    # 4) Cevap metnini topla (content, blok listesidir; text bloklarını birleştiriyoruz)
-    answer_text = "".join(b.text for b in response.content if b.type == "text")
+    # 4) Cevabı üret
+    answer_text = llm.generate(SYSTEM_PROMPT, user_message)
 
     # Hangi kaynakların kullanıldığını kullanıcıya da döndür (şeffaflık)
     sources = [
