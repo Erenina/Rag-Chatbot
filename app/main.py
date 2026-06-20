@@ -13,12 +13,15 @@ Sunucu çalışırken otomatik dökümantasyon:  http://localhost:8000/docs
 
 import os
 import uuid
+from pathlib import Path
 
-import anthropic
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app import ingestion, embeddings, vectorstore, rag
+from app.llm import LLMConfigError, LLMAPIError
 from app.models import (
     ChatRequest, ChatResponse, IngestResponse,
     DocumentsResponse, DocumentInfo,
@@ -32,6 +35,16 @@ app = FastAPI(
 
 # Yüklenen dosyalar için klasörü hazırla
 os.makedirs(settings.data_dir, exist_ok=True)
+
+# Frontend (statik tek sayfa). CWD'den bağımsız olsun diye mutlak yol.
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/")
+def index():
+    """Web arayüzünü (sohbet ekranı) servis et."""
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
@@ -83,16 +96,11 @@ async def ingest(file: UploadFile = File(...)):
 def chat(request: ChatRequest):
     try:
         result = rag.answer_question(request.question, top_k=request.top_k)
-    except anthropic.AuthenticationError:
-        # Geçersiz/eksik API key — kullanıcıya 500 yerine net mesaj ver
-        raise HTTPException(
-            status_code=401,
-            detail="Anthropic API key geçersiz. .env içindeki ANTHROPIC_API_KEY değerini kontrol et.",
-        )
-    except anthropic.RateLimitError:
-        raise HTTPException(status_code=429, detail="Anthropic API hız sınırına takıldı, biraz sonra tekrar dene.")
-    except anthropic.APIError as e:
-        # Diğer tüm Anthropic API hataları (ağ, sunucu vb.)
+    except LLMConfigError as e:
+        # Eksik/yanlış yapılandırma (ör. API key yok) — net mesaj ver
+        raise HTTPException(status_code=401, detail=str(e))
+    except LLMAPIError as e:
+        # LLM çağrısı başarısız (ağ, kota, sunucu vb.)
         raise HTTPException(status_code=502, detail=f"LLM çağrısı başarısız: {e}")
     return ChatResponse(**result)
 
