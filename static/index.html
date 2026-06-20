@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Chatbot — Belgelerinle Sohbet Et</title>
+
+  <!-- Tipografi: Plus Jakarta Sans (UI) + JetBrains Mono (kod/kaynak) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind (Play CDN — demo için yeterli; prod'da build edilir) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tasarım token'ları (ui-ux-pro-max: AI-Native UI, slate + scan-blue)
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary:   '#1E293B',
+            secondary: '#334155',
+            accent:    '#2563EB',
+            'accent-hover': '#1D4ED8',
+            background:'#F8FAFC',
+            foreground:'#0F172A',
+            muted:     '#F1F5F9',
+            'muted-fg':'#64748B',
+            border:    '#E2E8F0',
+            destructive:'#DC2626',
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background: #F8FAFC; }
+
+    /* Mesaj giriş animasyonu (smooth reveal) */
+    @keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .reveal { animation: reveal .25s ease-out both; }
+
+    /* Typing indicator (3 nokta pulse) */
+    @keyframes blink { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+    .dot { animation: blink 1.2s infinite both; }
+    .dot:nth-child(2) { animation-delay: .2s; }
+    .dot:nth-child(3) { animation-delay: .4s; }
+
+    /* İnce scrollbar */
+    .scroll-thin::-webkit-scrollbar { width: 8px; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+    .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+    /* Erişilebilirlik: hareketi azalt tercihi */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+
+    /* Atıf rozeti [1], [2] */
+    .cite { display:inline-flex; align-items:center; justify-content:center; min-width:1.25rem; height:1.25rem;
+            padding:0 .25rem; margin:0 .1rem; font-size:.7rem; font-weight:600; line-height:1;
+            color:#2563EB; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:.375rem; vertical-align:baseline; }
+  </style>
+</head>
+
+<body class="font-sans text-foreground antialiased">
+  <div class="flex flex-col h-dvh">
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="flex items-center justify-between gap-3 px-4 sm:px-6 h-16 bg-white border-b border-border shrink-0">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Logo: belge + kıvılcım (SVG, emoji değil) -->
+        <span class="grid place-items-center w-10 h-10 rounded-xl bg-accent text-white shrink-0" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
+            <path d="m9.5 13.5.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7z"/>
+          </svg>
+        </span>
+        <div class="min-w-0">
+          <h1 class="text-base font-700 font-semibold leading-tight truncate">RAG Chatbot</h1>
+          <p class="text-xs text-muted-fg leading-tight truncate">Belgelerini yükle, kaynak göstererek cevap al</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Sağlık göstergesi -->
+        <span id="status" class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-muted-fg px-2.5 py-1 rounded-full bg-muted">
+          <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+          <span id="statusText">bağlanıyor…</span>
+        </span>
+        <!-- Mobil sidebar toggle -->
+        <button id="sidebarToggle" class="md:hidden grid place-items-center w-10 h-10 rounded-lg hover:bg-muted cursor-pointer"
+                aria-label="Belgeler panelini aç/kapat">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===================== BODY ===================== -->
+    <div class="flex flex-1 min-h-0">
+
+      <!-- ---------- SIDEBAR (belgeler) ---------- -->
+      <aside id="sidebar"
+             class="hidden md:flex flex-col w-72 lg:w-80 bg-white border-r border-border shrink-0 overflow-y-auto scroll-thin">
+        <div class="p-4 space-y-4">
+
+          <!-- Upload kartı (drag & drop) -->
+          <div>
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-muted-fg mb-2">Belge Yükle</h2>
+            <label id="dropzone"
+                   class="flex flex-col items-center justify-center gap-2 px-4 py-6 rounded-xl border-2 border-dashed border-border
+                          bg-background hover:border-accent hover:bg-blue-50/40 transition-colors cursor-pointer text-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round" class="text-accent">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/>
+              </svg>
+              <span class="text-sm font-medium">Dosya seç veya sürükle</span>
+              <span class="text-xs text-muted-fg">PDF, TXT, MD</span>
+              <input id="fileInput" type="file" accept=".pdf,.txt,.md" class="hidden" />
+            </label>
+            <div id="uploadStatus" class="hidden mt-2 text-xs"></div>
+          </div>
+
+          <!-- Belge listesi -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-muted-fg">Belgeler</h2>
+              <button id="clearBtn" class="hidden items-center gap-1 text-xs text-destructive hover:underline cursor-pointer"
+                      aria-label="Tüm belgeleri sil">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                Temizle
+              </button>
+            </div>
+            <ul id="docList" class="space-y-1.5"></ul>
+            <p id="docEmpty" class="text-xs text-muted-fg py-3">Henüz belge yok. Yukarıdan bir dosya yükle.</p>
+            <p id="docTotal" class="hidden mt-3 pt-3 border-t border-border text-xs text-muted-fg"></p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Mobil overlay -->
+      <div id="overlay" class="hidden fixed inset-0 z-20 bg-black/40 md:hidden"></div>
+
+      <!-- ---------- CHAT ---------- -->
+      <main class="flex flex-col flex-1 min-w-0 bg-background">
+
+        <!-- Mesaj alanı -->
+        <div id="messages" class="flex-1 overflow-y-auto scroll-thin px-4 sm:px-6 py-6">
+          <!-- Boş durum -->
+          <div id="emptyState" class="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
+            <span class="grid place-items-center w-14 h-14 rounded-2xl bg-white border border-border shadow-sm mb-4" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round" class="text-accent">
+                <path d="M7.5 4.2 8.3 6l1.8.8L8.3 7.6 7.5 9.4 6.7 7.6 4.9 6.8 6.7 6z"/>
+                <path d="M17 11l.9 2 2 .9-2 .9L17 17l-.9-2-2-.9 2-.9z"/>
+                <path d="M12 3v0"/>
+              </svg>
+            </span>
+            <h2 class="text-lg font-semibold mb-1">Belgelerinle sohbet et</h2>
+            <p class="text-sm text-muted-fg">Soldan bir belge yükle, sonra içeriğiyle ilgili soru sor. Cevaplar yalnızca belgelerine dayanır ve kaynak gösterir.</p>
+          </div>
+        </div>
+
+        <!-- Composer (soru kutusu) -->
+        <div class="border-t border-border bg-white px-4 sm:px-6 py-3 shrink-0">
+          <form id="chatForm" class="flex items-end gap-2 max-w-3xl mx-auto">
+            <div class="flex-1 relative">
+              <textarea id="questionInput" rows="1" placeholder="Belgelerine bir soru sor…"
+                        class="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 pr-12 text-sm
+                               placeholder:text-muted-fg focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent
+                               max-h-40 scroll-thin"></textarea>
+            </div>
+            <button id="sendBtn" type="submit"
+                    class="grid place-items-center w-12 h-12 rounded-xl bg-accent text-white hover:bg-accent-hover
+                           focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50
+                           disabled:cursor-not-allowed cursor-pointer transition-colors shrink-0"
+                    aria-label="Gönder">
+              <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+              <svg id="sendSpinner" class="hidden animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg>
+            </button>
+          </form>
+          <p class="text-[11px] text-muted-fg text-center mt-2 max-w-3xl mx-auto">Enter ile gönder · Shift+Enter ile yeni satır</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed bottom-4 right-4 z-50 max-w-xs px-4 py-3 rounded-xl shadow-lg text-sm font-medium" role="status" aria-live="polite"></div>
+
+  <script>
+    // ============== Yardımcılar ==============
+    const $ = (sel) => document.querySelector(sel);
+    const api = {
+      health:    () => fetch('/health').then(r => r.json()),
+      documents: () => fetch('/documents').then(r => r.json()),
+      ingest:    (file) => { const fd = new FormData(); fd.append('file', file); return fetch('/ingest', { method:'POST', body: fd }); },
+      chat:      (question) => fetch('/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question }) }),
+    };
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    // [1], [2] atıflarını rozete çevir
+    function withCitations(text) {
+      return escapeHtml(text).replace(/\[(\d+)\]/g, '<span class="cite">$1</span>');
+    }
+
+    function showToast(message, type = 'success') {
+      const t = $('#toast');
+      t.textContent = message;
+      t.className = 'fixed bottom-4 right-4 z-50 max-w-xs px-4 py-3 rounded-xl shadow-lg text-sm font-medium reveal ' +
+        (type === 'error' ? 'bg-destructive text-white' : 'bg-primary text-white');
+      t.classList.remove('hidden');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.add('hidden'), 4000);
+    }
+
+    // ============== Sağlık + belgeler ==============
+    async function refreshHealth() {
+      try {
+        const h = await api.health();
+        $('#statusDot').className = 'w-2 h-2 rounded-full bg-emerald-500';
+        $('#statusText').textContent = `çevrimiçi · ${h.total_chunks} parça`;
+      } catch {
+        $('#statusDot').className = 'w-2 h-2 rounded-full bg-destructive';
+        $('#statusText').textContent = 'sunucu kapalı';
+      }
+    }
+
+    function fileIcon() {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" class="text-muted-fg shrink-0">
+               <path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>`;
+    }
+
+    async function refreshDocuments() {
+      let data;
+      try { data = await api.documents(); } catch { return; }
+      const list = $('#docList');
+      list.innerHTML = '';
+      if (!data.documents.length) {
+        $('#docEmpty').classList.remove('hidden');
+        $('#docTotal').classList.add('hidden');
+        $('#clearBtn').classList.add('hidden');
+        $('#clearBtn').classList.remove('flex');
+        return;
+      }
+      $('#docEmpty').classList.add('hidden');
+      $('#clearBtn').classList.remove('hidden');
+      $('#clearBtn').classList.add('flex');
+      data.documents.forEach(d => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2 px-3 py-2 rounded-lg bg-background border border-border';
+        li.innerHTML = `${fileIcon()}
+          <span class="text-sm truncate flex-1" title="${escapeHtml(d.source)}">${escapeHtml(d.source)}</span>
+          <span class="text-[11px] font-mono text-muted-fg shrink-0">${d.chunks}</span>`;
+        list.appendChild(li);
+      });
+      const total = $('#docTotal');
+      total.textContent = `${data.documents.length} belge · ${data.total_chunks} parça`;
+      total.classList.remove('hidden');
+    }
+
+    // ============== Mesaj render ==============
+    function clearEmptyState() { const e = $('#emptyState'); if (e) e.remove(); }
+
+    function addUserMessage(text) {
+      clearEmptyState();
+      const wrap = document.createElement('div');
+      wrap.className = 'reveal flex justify-end mb-4 max-w-3xl mx-auto';
+      wrap.innerHTML = `<div class="max-w-[85%] rounded-2xl rounded-br-md bg-accent text-white px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</div>`;
+      $('#messages').appendChild(wrap);
+      scrollDown();
+    }
+
+    function addTyping() {
+      clearEmptyState();
+      const wrap = document.createElement('div');
+      wrap.id = 'typing';
+      wrap.className = 'flex justify-start mb-4 max-w-3xl mx-auto';
+      wrap.innerHTML = `<div class="flex items-center gap-1 rounded-2xl rounded-bl-md bg-white border border-border px-4 py-3">
+          <span class="dot w-1.5 h-1.5 rounded-full bg-muted-fg"></span>
+          <span class="dot w-1.5 h-1.5 rounded-full bg-muted-fg"></span>
+          <span class="dot w-1.5 h-1.5 rounded-full bg-muted-fg"></span>
+        </div>`;
+      $('#messages').appendChild(wrap);
+      scrollDown();
+    }
+    function removeTyping() { const t = $('#typing'); if (t) t.remove(); }
+
+    function sourcesHtml(sources) {
+      if (!sources || !sources.length) return '';
+      const cards = sources.map(s => `
+        <div class="rounded-lg border border-border bg-background p-2.5">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="cite">${s.index}</span>
+            <span class="text-xs font-medium truncate flex-1" title="${escapeHtml(s.source)}">${escapeHtml(s.source)}</span>
+            <span class="text-[11px] font-mono text-muted-fg">${(s.score*100).toFixed(0)}%</span>
+          </div>
+          <div class="h-1 w-full rounded-full bg-muted overflow-hidden mb-1.5">
+            <div class="h-full bg-accent rounded-full" style="width:${Math.max(0, Math.min(100, s.score*100))}%"></div>
+          </div>
+          <p class="text-[11px] text-muted-fg leading-snug font-mono">${escapeHtml(s.preview)}</p>
+        </div>`).join('');
+      return `<details class="mt-3 group">
+          <summary class="flex items-center gap-1.5 text-xs font-medium text-muted-fg cursor-pointer select-none hover:text-foreground">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform group-open:rotate-90"><path d="M9 18l6-6-6-6"/></svg>
+            ${sources.length} kaynak
+          </summary>
+          <div class="mt-2 space-y-2">${cards}</div>
+        </details>`;
+    }
+
+    function addAssistantMessage(answer, sources) {
+      const wrap = document.createElement('div');
+      wrap.className = 'reveal flex justify-start mb-4 max-w-3xl mx-auto';
+      wrap.innerHTML = `<div class="max-w-[90%] rounded-2xl rounded-bl-md bg-white border border-border px-4 py-3 text-sm leading-relaxed">
+          <div class="whitespace-pre-wrap">${withCitations(answer)}</div>
+          ${sourcesHtml(sources)}
+        </div>`;
+      $('#messages').appendChild(wrap);
+      scrollDown();
+    }
+
+    function addErrorMessage(text) {
+      const wrap = document.createElement('div');
+      wrap.className = 'reveal flex justify-start mb-4 max-w-3xl mx-auto';
+      wrap.innerHTML = `<div class="max-w-[90%] rounded-2xl rounded-bl-md bg-red-50 border border-red-200 text-destructive px-4 py-3 text-sm leading-relaxed">
+          <div class="flex items-start gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="mt-0.5 shrink-0"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+            <span>${escapeHtml(text)}</span>
+          </div>
+        </div>`;
+      $('#messages').appendChild(wrap);
+      scrollDown();
+    }
+
+    function scrollDown() { const m = $('#messages'); m.scrollTop = m.scrollHeight; }
+
+    // ============== Aksiyonlar ==============
+    function setSending(sending) {
+      $('#sendBtn').disabled = sending;
+      $('#sendIcon').classList.toggle('hidden', sending);
+      $('#sendSpinner').classList.toggle('hidden', !sending);
+    }
+
+    async function handleChat(question) {
+      addUserMessage(question);
+      setSending(true);
+      addTyping();
+      try {
+        const res = await api.chat(question);
+        removeTyping();
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          addErrorMessage(err.detail || `Hata (${res.status})`);
+          return;
+        }
+        const data = await res.json();
+        addAssistantMessage(data.answer, data.sources);
+      } catch (e) {
+        removeTyping();
+        addErrorMessage('Sunucuya ulaşılamadı. Çalışıyor mu?');
+      } finally {
+        setSending(false);
+      }
+    }
+
+    async function handleUpload(file) {
+      if (!file) return;
+      const box = $('#uploadStatus');
+      box.classList.remove('hidden');
+      box.className = 'mt-2 text-xs text-muted-fg flex items-center gap-1.5';
+      box.innerHTML = `<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg> "${escapeHtml(file.name)}" yükleniyor…`;
+      try {
+        const res = await api.ingest(file);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          box.className = 'mt-2 text-xs text-destructive';
+          box.textContent = data.detail || `Yükleme başarısız (${res.status})`;
+          showToast('Yükleme başarısız', 'error');
+          return;
+        }
+        box.className = 'mt-2 text-xs text-emerald-600';
+        box.textContent = `✓ ${data.chunks_added} parça eklendi`;
+        showToast(`"${data.filename}" yüklendi`);
+        await Promise.all([refreshDocuments(), refreshHealth()]);
+      } catch {
+        box.className = 'mt-2 text-xs text-destructive';
+        box.textContent = 'Sunucuya ulaşılamadı.';
+        showToast('Sunucuya ulaşılamadı', 'error');
+      } finally {
+        setTimeout(() => box.classList.add('hidden'), 4000);
+      }
+    }
+
+    async function handleClear() {
+      if (!confirm('Tüm belgeler ve vektörler silinecek. Emin misin?')) return;
+      try {
+        await fetch('/documents', { method: 'DELETE' });
+        showToast('Tüm belgeler silindi');
+        await Promise.all([refreshDocuments(), refreshHealth()]);
+      } catch { showToast('Silme başarısız', 'error'); }
+    }
+
+    // ============== Olay bağlama ==============
+    // Textarea otomatik yükseklik
+    const ta = $('#questionInput');
+    ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; });
+    // Enter gönder / Shift+Enter yeni satır
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#chatForm').requestSubmit(); }
+    });
+
+    $('#chatForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = ta.value.trim();
+      if (!q) return;
+      ta.value = ''; ta.style.height = 'auto';
+      handleChat(q);
+    });
+
+    // Dosya seçme
+    $('#fileInput').addEventListener('change', (e) => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ''; });
+
+    // Drag & drop
+    const dz = $('#dropzone');
+    ['dragover','dragenter'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('border-accent','bg-blue-50/40'); }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('border-accent','bg-blue-50/40'); }));
+    dz.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]); });
+
+    $('#clearBtn').addEventListener('click', handleClear);
+
+    // Mobil sidebar
+    const sidebar = $('#sidebar'), overlay = $('#overlay');
+    function openSidebar() { sidebar.classList.remove('hidden'); sidebar.classList.add('flex','fixed','z-30','inset-y-0','left-0','top-16'); overlay.classList.remove('hidden'); }
+    function closeSidebar() { sidebar.classList.add('hidden'); sidebar.classList.remove('fixed','z-30','inset-y-0','left-0','top-16'); overlay.classList.add('hidden'); }
+    $('#sidebarToggle').addEventListener('click', () => sidebar.classList.contains('hidden') ? openSidebar() : closeSidebar());
+    overlay.addEventListener('click', closeSidebar);
+
+    // Başlangıç
+    refreshHealth();
+    refreshDocuments();
+    setInterval(refreshHealth, 15000);
+  </script>
+</body>
+</html>
