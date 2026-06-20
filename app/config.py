@@ -14,10 +14,17 @@ class Settings(BaseSettings):
     # .env dosyasını oku, tanımadığı ekstra değişkenleri görmezden gel
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # --- LLM ---
-    anthropic_api_key: str                      # zorunlu; .env'de yoksa hata verir
-    chat_model: str = "claude-opus-4-8"
+    # --- LLM (provider değiştirilebilir) ---
+    llm_provider: str = "gemini"                # "gemini" | "claude"
     max_answer_tokens: int = 1024               # cevap için üst sınır
+
+    # Gemini (ücretsiz kota) — https://aistudio.google.com/apikey
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+
+    # Claude (paralı) — kullanmak istersen LLM_PROVIDER=claude yap
+    anthropic_api_key: str | None = None
+    chat_model: str = "claude-opus-4-8"
 
     # --- Embedding ---
     embedding_model: str = "intfloat/multilingual-e5-small"
