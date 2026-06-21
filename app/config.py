@@ -15,12 +15,26 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- LLM (provider değiştirilebilir) ---
-    llm_provider: str = "gemini"                # "gemini" | "claude"
+    llm_provider: str = "groq"                  # "groq" | "gemini" | "claude"
     max_answer_tokens: int = 1024               # cevap için üst sınır
 
     # Gemini (ücretsiz kota) — https://aistudio.google.com/apikey
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    # Not: gemini-2.5-flash ücretsiz katmanda günde sadece ~20 istek veriyor;
+    # flash-lite'ın günlük limiti çok daha yüksek, bu yüzden varsayılan o.
+    gemini_model: str = "gemini-2.5-flash-lite"
+
+    # Groq (ücretsiz, yüksek limit) — https://console.groq.com
+    groq_api_key: str | None = None
+    groq_model: str = "llama-3.1-8b-instant"    # üretici: hızlı + yüksek günlük limit
+
+    # --- Eval yargıcı (judge) ---
+    # Yargıç, üreticiden FARKLI sağlayıcı/model kullanabilir: hem yükü ikinci bir
+    # ücretsiz kotaya dağıtır hem de self-preference bias'ı (kendi cevabını
+    # kayırma) azaltır. judge_model=None ise seçilen sağlayıcının kendi
+    # varsayılan modeli kullanılır.
+    judge_provider: str = "groq"               # "groq" | "gemini" | "claude"
+    judge_model: str | None = "llama-3.3-70b-versatile"  # yargıç: daha güçlü model
 
     # Claude (paralı) — kullanmak istersen LLM_PROVIDER=claude yap
     anthropic_api_key: str | None = None

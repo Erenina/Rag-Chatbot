@@ -21,17 +21,31 @@ class LLMAPIError(Exception):
     """LLM çağrısı sırasında oluşan hata (ağ, kota, sunucu vb.)."""
 
 
-def generate(system_prompt: str, user_message: str) -> str:
-    """Seçili sağlayıcıyla cevap üret ve düz metin döndür."""
-    provider = settings.llm_provider.lower()
+def generate(
+    system_prompt: str,
+    user_message: str,
+    model: str | None = None,
+    provider: str | None = None,
+) -> str:
+    """
+    Seçili sağlayıcıyla cevap üret ve düz metin döndür.
+
+    provider: None ise ayarlardaki LLM_PROVIDER kullanılır. Eval'in yargıç
+              katmanı, üreticiden FARKLI bir sağlayıcı (ör. groq) geçebilsin
+              diye opsiyonel — yükü böler ve self-preference bias'ı azaltır.
+    model:    None ise o sağlayıcının varsayılan modeli kullanılır.
+    """
+    provider = (provider or settings.llm_provider).lower()
     if provider == "gemini":
-        return _generate_gemini(system_prompt, user_message)
+        return _generate_gemini(system_prompt, user_message, model)
+    if provider == "groq":
+        return _generate_groq(system_prompt, user_message, model)
     if provider == "claude":
-        return _generate_claude(system_prompt, user_message)
-    raise LLMConfigError(f"Bilinmeyen LLM_PROVIDER: {settings.llm_provider} (gemini | claude)")
+        return _generate_claude(system_prompt, user_message, model)
+    raise LLMConfigError(f"Bilinmeyen sağlayıcı: {provider} (gemini | groq | claude)")
 
 
-def _generate_gemini(system_prompt: str, user_message: str) -> str:
+def _generate_gemini(system_prompt: str, user_message: str, model: str | None = None) -> str:
     if not settings.gemini_api_key:
         raise LLMConfigError(
             "GEMINI_API_KEY tanımlı değil. https://aistudio.google.com/apikey "
@@ -45,7 +59,7 @@ def _generate_gemini(system_prompt: str, user_message: str) -> str:
     client = genai.Client(api_key=settings.gemini_api_key)
     try:
         response = client.models.generate_content(
-            model=settings.gemini_model,
+            model=model or settings.gemini_model,
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -57,7 +71,33 @@ def _generate_gemini(system_prompt: str, user_message: str) -> str:
     return response.text or ""
 
 
-def _generate_claude(system_prompt: str, user_message: str) -> str:
+def _generate_groq(system_prompt: str, user_message: str, model: str | None = None) -> str:
+    if not settings.groq_api_key:
+        raise LLMConfigError(
+            "GROQ_API_KEY tanımlı değil. https://console.groq.com adresinden "
+            "ücretsiz key al (gsk_... ile başlar) ve .env'e ekle."
+        )
+    # SDK import'u tembel: yalnızca Groq kullanılırken yüklensin
+    from groq import Groq
+    import groq as groq_sdk
+
+    client = Groq(api_key=settings.groq_api_key)
+    try:
+        # Groq, OpenAI uyumlu sohbet API'si kullanır: system + user mesajları
+        response = client.chat.completions.create(
+            model=model or settings.groq_model,
+            max_tokens=settings.max_answer_tokens,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+    except groq_sdk.APIError as e:
+        raise LLMAPIError(str(e))
+    return response.choices[0].message.content or ""
+
+
+def _generate_claude(system_prompt: str, user_message: str, model: str | None = None) -> str:
     if not settings.anthropic_api_key:
         raise LLMConfigError("ANTHROPIC_API_KEY tanımlı değil (.env'i kontrol et).")
     import anthropic
@@ -65,7 +105,7 @@ def _generate_claude(system_prompt: str, user_message: str) -> str:
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     try:
         response = client.messages.create(
-            model=settings.chat_model,
+            model=model or settings.chat_model,
             max_tokens=settings.max_answer_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],

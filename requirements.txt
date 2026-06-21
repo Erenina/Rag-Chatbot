@@ -5,7 +5,8 @@ python-multipart>=0.0.9      # FastAPI'de dosya yükleme (UploadFile) için gere
 pydantic-settings>=2.4       # .env'den ayarları okumak için
 
 # --- LLM (provider değiştirilebilir) ---
-google-genai>=1.0           # Gemini (ücretsiz kota) — varsayılan sağlayıcı
+google-genai>=1.0           # Gemini (ücretsiz kota) — varsayılan üretici
+groq>=0.11                  # Groq (ücretsiz, yüksek limit) — eval yargıcı için ideal
 anthropic>=0.45             # Claude API (opsiyonel, LLM_PROVIDER=claude için)
 
 # --- RAG bileşenleri ---
