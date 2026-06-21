@@ -82,3 +82,35 @@ def _tail_words(words: list[str], overlap_chars: int) -> list[str]:
         tail.insert(0, word)
         total += len(word) + 1
     return tail
+
+
+def _document_title(text: str) -> str:
+    """Belgenin ilk anlamlı satırını 'başlık' olarak al (genelde belge/şirket adı)."""
+    for line in text.splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def chunk_text_with_context(
+    text: str,
+    chunk_size: int | None = None,
+    overlap: int | None = None,
+) -> list[str]:
+    """
+    chunk_text gibi böler, AMA her parçanın başına belgenin BAŞLIĞINI ekler.
+
+    Neden? Chunk'lama, bir parçanın hangi belgeye/şirkete ait olduğunu
+    kaybedebilir: ör. bir belgenin 2. parçasında artık şirket adı geçmeyebilir.
+    Birden çok benzer belge varken (Acme vs Beta) model parçaları karıştırır ve
+    yanlış belgenin bilgisini verir. Başlığı her parçaya iliştirmek bu
+    "attribution" (atıf) kaybını önler — basit bir 'contextual chunking'.
+    Hem retrieval'ı (başlık embedding'e girer) hem de generation'ı (model hangi
+    belge olduğunu görür) iyileştirir.
+    """
+    title = _document_title(text)
+    chunks = chunk_text(text, chunk_size, overlap)
+    if not title:
+        return chunks
+    # İlk parça zaten başlıkla başlar; tekrarı önleyip diğerlerine başlığı ekle.
+    return [c if c.startswith(title) else f"{title}\n\n{c}" for c in chunks]

@@ -71,8 +71,8 @@ async def ingest(file: UploadFile = File(...)):
     if not text.strip():
         raise HTTPException(status_code=400, detail="Dosyadan metin çıkarılamadı (boş ya da taranmış görsel PDF olabilir).")
 
-    # 3) Chunk'la
-    chunks = ingestion.chunk_text(text)
+    # 3) Chunk'la (her parçaya belge başlığını ekleyerek — contextual chunking)
+    chunks = ingestion.chunk_text_with_context(text)
     if not chunks:
         raise HTTPException(status_code=400, detail="Metin chunk'lara bölünemedi.")
 
