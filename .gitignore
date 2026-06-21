@@ -11,5 +11,8 @@ venv/
 data/
 chroma_db/
 
+# Eval koşusunun ürettiği rapor (her çalıştırmada değişir)
+evals/report.json
+
 # macOS
 .DS_Store

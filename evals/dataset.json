@@ -1,0 +1,64 @@
+[
+  {
+    "id": "acme-izin",
+    "question": "Acme'de tam zamanlı çalışanlar yılda kaç gün ücretli izne hak kazanır?",
+    "ground_truth": "Acme'de tam zamanlı çalışanlar yılda 20 gün ücretli yıllık izne hak kazanır.",
+    "context_keywords": ["20 gün"]
+  },
+  {
+    "id": "acme-uzaktan",
+    "question": "Acme'de haftada en fazla kaç gün uzaktan çalışılabilir?",
+    "ground_truth": "Acme'de haftada en fazla 3 gün uzaktan çalışılabilir.",
+    "context_keywords": ["3 gün"]
+  },
+  {
+    "id": "acme-yemek",
+    "question": "Acme'de iş seyahatlerinde günlük yemek limiti nedir?",
+    "ground_truth": "Acme'de günlük yemek limiti 400 TL'dir.",
+    "context_keywords": ["400"]
+  },
+  {
+    "id": "acme-egitim",
+    "question": "Acme'de çalışan başına yıllık eğitim bütçesi ne kadardır?",
+    "ground_truth": "Acme'de her çalışan için yıllık 10000 TL eğitim bütçesi ayrılır.",
+    "context_keywords": ["10000"]
+  },
+  {
+    "id": "beta-izin",
+    "question": "Beta Teknoloji'de yıllık ücretli izin kaç gündür?",
+    "ground_truth": "Beta Teknoloji'de yılda 14 gün ücretli yıllık izin verilir.",
+    "context_keywords": ["14 gün"]
+  },
+  {
+    "id": "beta-uzaktan",
+    "question": "Beta'da haftada en fazla kaç gün uzaktan çalışılabilir?",
+    "ground_truth": "Beta'da haftada en fazla 4 gün uzaktan çalışılabilir.",
+    "context_keywords": ["4 gün"]
+  },
+  {
+    "id": "beta-yemek",
+    "question": "Beta'da iş seyahatlerinde günlük yemek limiti nedir?",
+    "ground_truth": "Beta'da günlük yemek limiti 300 TL'dir.",
+    "context_keywords": ["300"]
+  },
+  {
+    "id": "beta-saglik",
+    "question": "Beta Teknoloji çalışanlarına sağlık sigortası sağlanıyor mu?",
+    "ground_truth": "Evet, Beta Teknoloji tüm tam zamanlı çalışanlara özel sağlık sigortası sağlar.",
+    "context_keywords": ["sağlık sigortası"]
+  },
+  {
+    "id": "acme-saglik-capraz",
+    "question": "Acme'de sağlık sigortası sağlanıyor mu?",
+    "ground_truth": "Acme'nin belgesinde sağlık sigortasına dair bir bilgi bulunmuyor. (Sağlık sigortası yalnızca Beta belgesinde geçer; Acme için bu bilgi yok.)",
+    "context_keywords": [],
+    "expect_refusal": true
+  },
+  {
+    "id": "kurulus-yili",
+    "question": "Acme Yazılım A.Ş. hangi yıl kuruldu?",
+    "ground_truth": "Bu bilgi yüklenen belgelerde bulunmuyor.",
+    "context_keywords": [],
+    "expect_refusal": true
+  }
+]
