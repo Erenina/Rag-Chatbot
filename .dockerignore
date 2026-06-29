@@ -1,0 +1,20 @@
+# Sırlar ASLA imaja girmesin (key'ler HF Spaces secret'tan env olarak gelir)
+.env
+
+# Versiyon kontrol + Python ara dosyaları
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Çalışma zamanı verileri (imajda olmamalı; runtime'da/preload'da oluşur)
+chroma_db/
+data/
+evals/report.json
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

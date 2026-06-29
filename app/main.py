@@ -41,6 +41,35 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.on_event("startup")
+def _preload_examples() -> None:
+    """
+    Deploy/demo için: PRELOAD_EXAMPLES açıksa, examples/ klasöründeki belgeleri
+    açılışta vektör DB'ye yükle. HuggingFace Spaces gibi ortamlarda disk geçicidir;
+    bu sayede her yeniden başlatmada demo otomatik dolu gelir. Hata olursa
+    uygulamayı çökertmez, sadece o belgeyi atlar.
+    """
+    if os.getenv("PRELOAD_EXAMPLES", "").lower() not in ("1", "true", "yes"):
+        return
+    examples_dir = Path(__file__).resolve().parent.parent / "examples"
+    if not examples_dir.is_dir():
+        return
+    existing = vectorstore.list_documents()
+    for path in sorted(examples_dir.glob("*")):
+        if path.suffix.lower() not in (".txt", ".md", ".pdf") or path.name in existing:
+            continue
+        try:
+            text = ingestion.extract_text(str(path), path.name)
+            chunks = ingestion.chunk_text_with_context(text)
+            vectors = embeddings.embed_passages(chunks)
+            ids = [f"{path.name}::{i}" for i in range(len(chunks))]
+            metadatas = [{"source": path.name, "chunk_index": i} for i in range(len(chunks))]
+            vectorstore.add_chunks(ids=ids, documents=chunks, embeddings=vectors, metadatas=metadatas)
+            print(f"[preload] '{path.name}' yüklendi ({len(chunks)} parça).")
+        except Exception as e:  # açılış demoyu çökertmesin
+            print(f"[preload] '{path.name}' atlandı: {e}")
+
+
 @app.get("/")
 def index():
     """Web arayüzünü (sohbet ekranı) servis et."""

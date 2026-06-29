@@ -1,3 +1,13 @@
+---
+title: RAG Chatbot
+emoji: 📄
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # RAG Chatbot
 
 A document question-answering web app built with **FastAPI**, **local embeddings**, **ChromaDB**, and a **provider-agnostic LLM layer** (Groq, Google Gemini, or Claude). Upload your documents (PDF / TXT / MD), then ask questions and get answers grounded in your content — **with cited sources** — through a clean web UI.
