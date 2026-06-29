@@ -10,6 +10,8 @@ pinned: false
 
 # RAG Chatbot
 
+**🚀 Live demo: [huggingface.co/spaces/eraxes/rag-chatbot](https://huggingface.co/spaces/eraxes/rag-chatbot)**
+
 A document question-answering web app built with **FastAPI**, **local embeddings**, **ChromaDB**, and a **provider-agnostic LLM layer** (Groq, Google Gemini, or Claude). Upload your documents (PDF / TXT / MD), then ask questions and get answers grounded in your content — **with cited sources** — through a clean web UI.
 
 This is a Retrieval-Augmented Generation (RAG) system: instead of letting the LLM answer from memory (and hallucinate), it retrieves the most relevant chunks from your documents and instructs the model to answer **only** from that context.
